@@ -12,6 +12,7 @@ into a numpy/pandas table and scored vectorised.
 """
 from __future__ import annotations
 import datetime as _dt
+import re
 import jd_config as J
 
 _TODAY = _dt.date(2026, 6, 7)   # dataset "now"; keep deterministic, not date.today()
@@ -19,6 +20,35 @@ _TODAY = _dt.date(2026, 6, 7)   # dataset "now"; keep deterministic, not date.to
 
 def _lower(s) -> str:
     return (s or "").lower()
+
+
+# ---------------------------------------------------------------------------
+# Word-boundary keyword matching.
+# Naive `kw in text` is unsafe for short tokens: "rag" matches "leveRAGe",
+# "feed" matches "feedback", "tts" matches "waTTS", "search" matches "reSEARCH".
+# That caused false work-evidence AND hallucinated reasoning ("built RAG..."),
+# so all keyword checks go through a cached word-boundary regex.
+# ---------------------------------------------------------------------------
+_KW_CACHE: dict[str, "re.Pattern"] = {}
+
+
+def _kw_regex(kw: str) -> "re.Pattern":
+    p = _KW_CACHE.get(kw)
+    if p is None:
+        k = kw.strip()
+        left = r"\b" if k[:1].isalnum() else ""
+        right = r"\b" if k[-1:].isalnum() else ""
+        p = _KW_CACHE[kw] = re.compile(left + re.escape(k) + right, re.IGNORECASE)
+    return p
+
+
+def kw_count(text: str, keywords) -> int:
+    """Number of distinct keywords that appear as whole tokens in text."""
+    return sum(1 for k in keywords if _kw_regex(k).search(text))
+
+
+def kw_present(text: str, keywords) -> bool:
+    return any(_kw_regex(k).search(text) for k in keywords)
 
 
 def profile_text(c: dict) -> str:
@@ -50,9 +80,8 @@ def career_work_evidence(c: dict) -> float:
     parts = [c["profile"].get("summary", "")]
     for j in c.get("career_history", []):
         parts.append(j.get("description", ""))
-    text = " ".join(parts).lower()
-    hits = sum(1 for k in J.WORK_RETRIEVAL if k in text)
-    hits += sum(1 for k in J.WORK_EVAL if k in text)
+    text = " ".join(parts)
+    hits = kw_count(text, J.WORK_RETRIEVAL) + kw_count(text, J.WORK_EVAL)
     return min(1.0, hits / 5.0)
 
 
@@ -164,9 +193,9 @@ def penalties(c: dict) -> tuple[float, list[str]]:
     pen = 0.0
     reasons = []
     companies = [_lower(j.get("company")) for j in c.get("career_history", [])]
-    text = profile_text(c).lower()
+    text = profile_text(c)
 
-    # Services-only entire career
+    # Services-only entire career (company names are distinctive -> substring is fine)
     if companies and all(any(f in co for f in J.SERVICES_FIRMS) for co in companies):
         pen += J.PEN_SERVICES_ONLY
         reasons.append("services-firm-only career")
@@ -177,16 +206,16 @@ def penalties(c: dict) -> tuple[float, list[str]]:
         pen += J.PEN_TITLE_HOP
         reasons.append("frequent job-hopping")
 
-    # Wrong domain (CV/speech/robotics) with NO NLP/IR presence
-    has_wrong = any(w in text for w in J.WRONG_DOMAIN)
-    has_nlp = any(w in text for w in ("nlp", "retrieval", "ranking", "search",
-                                      "recommendation", "language model"))
+    # Wrong domain (CV/speech/robotics) with NO NLP/IR presence (word-boundary)
+    has_wrong = kw_present(text, J.WRONG_DOMAIN)
+    has_nlp = kw_present(text, ["nlp", "retrieval", "ranking", "recommendation",
+                                "language model", "semantic search", "search relevance"])
     if has_wrong and not has_nlp:
         pen += J.PEN_WRONG_DOMAIN
         reasons.append("CV/speech/robotics focus without NLP/IR")
 
     # Research-only
-    if any(r in text for r in J.RESEARCH_ONLY) and "production" not in text:
+    if kw_present(text, J.RESEARCH_ONLY) and not kw_present(text, ["production"]):
         pen += J.PEN_RESEARCH_ONLY
         reasons.append("research-only, no production")
 
@@ -277,6 +306,44 @@ def honeypot_flags(c: dict) -> list[str]:
             break
 
     return flags
+
+
+# ---------------------------------------------------------------------------
+# Combine — the single scoring function shared by rank.py and the HF sandbox.
+# ---------------------------------------------------------------------------
+def combine_score(c: dict, sem_f: float) -> tuple[float, dict]:
+    """Final score for one candidate given its semantic similarity to the JD.
+
+        score = base_fit x behavioral_multiplier x honeypot_gate
+        base_fit = W_TITLE_CAREER*title + W_SEMANTIC*sem
+                 + W_EXPERIENCE*exp + W_SKILLS_TRUST*skills  -  penalties
+
+    Returns (score, comps) where comps carries the component values + notes used
+    for reasoning. Keeping this in one place means rank.py (precomputed
+    embeddings) and the sandbox (on-the-fly embeddings) can never drift.
+    """
+    title_f = title_career_fit(c)
+    exp_f = experience_fit(c)
+    skills_f = skills_trust(c)
+    pen, pen_reasons = penalties(c)
+    beh_m, beh_notes = behavioral_multiplier(c)
+    hp = honeypot_flags(c)
+
+    base = (J.W_TITLE_CAREER * title_f
+            + J.W_SEMANTIC * float(sem_f)
+            + J.W_EXPERIENCE * exp_f
+            + J.W_SKILLS_TRUST * skills_f)
+    base = max(0.0, min(1.0, base - pen))
+    gate = J.HONEYPOT_FACTOR if len(hp) >= 1 else 1.0
+    score = base * beh_m * gate
+
+    comps = {
+        "title_career_fit": title_f, "semantic_fit": float(sem_f),
+        "experience_fit": exp_f, "skills_trust": skills_f,
+        "penalty_reasons": pen_reasons, "behavior_notes": beh_notes,
+        "honeypot_flags": hp,
+    }
+    return score, comps
 
 
 # ---------------------------------------------------------------------------

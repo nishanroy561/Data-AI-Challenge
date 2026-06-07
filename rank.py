@@ -56,8 +56,7 @@ def load_semantic(artifacts_dir, ids, pool):
     work_kw = list(dict.fromkeys(J.WORK_RETRIEVAL + J.WORK_EVAL + J.WORK_ML_PROD))
     out = np.zeros(len(ids))
     for i, c in enumerate(pool):
-        text = F.profile_text(c).lower()
-        hits = sum(1 for k in work_kw if k in text)
+        hits = F.kw_count(F.profile_text(c), work_kw)   # word-boundary, not substring
         out[i] = min(1.0, hits / 10.0)   # saturates less; embeddings differentiate better
     return out
 
@@ -82,34 +81,13 @@ def main():
     print("Scoring...")
     rows = []
     for i, c in enumerate(pool):
-        title_f = F.title_career_fit(c)
-        exp_f = F.experience_fit(c)
-        skills_f = F.skills_trust(c)
-        sem_f = float(sem[i])
-        pen, pen_reasons = F.penalties(c)
-        beh_m, beh_notes = F.behavioral_multiplier(c)
-        hp = F.honeypot_flags(c)
-
-        base = (J.W_TITLE_CAREER * title_f
-                + J.W_SEMANTIC * sem_f
-                + J.W_EXPERIENCE * exp_f
-                + J.W_SKILLS_TRUST * skills_f)
-        base = max(0.0, min(1.0, base - pen))
-
-        gate = J.HONEYPOT_FACTOR if len(hp) >= 1 else 1.0   # >=1 inconsistency -> bury
-        score = base * beh_m * gate
-
+        score, comps = F.combine_score(c, float(sem[i]))
         rows.append({
             "candidate_id": c["candidate_id"],
             # Round to the SAME precision we emit, so the sort tie-break matches
             # exactly what the validator sees in the CSV.
             "score": round(score, 4),
-            "comps": {
-                "title_career_fit": title_f, "semantic_fit": sem_f,
-                "experience_fit": exp_f, "skills_trust": skills_f,
-                "penalty_reasons": pen_reasons, "behavior_notes": beh_notes,
-                "honeypot_flags": hp,
-            },
+            "comps": comps,
             "_c": c,
         })
 

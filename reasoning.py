@@ -52,9 +52,12 @@ def _named_skill(c: dict):
 
 
 def _evidence_phrase(c: dict):
-    text = F.profile_text(c).lower()
+    """First real-work phrase whose keyword appears as a WHOLE WORD in the career
+    narrative. Word-boundary matching prevents hallucinations like claiming "built
+    RAG pipelines" because "rag" appeared inside "leverage"."""
+    text = F.profile_text(c)
     for needle, phrase in _EVIDENCE:
-        if needle in text:
+        if F.kw_present(text, [needle]):
             return phrase
     return None
 
