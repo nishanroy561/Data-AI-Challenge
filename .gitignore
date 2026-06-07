@@ -1,0 +1,16 @@
+# Large data — never commit the 487 MB pool
+candidates.jsonl
+candidates.jsonl.gz
+*.jsonl
+
+# Output
+submission.csv
+
+# Embedding artifacts are large (~150 MB). Either use git-lfs, or regenerate via
+# precompute.py. Uncomment to ignore; document regeneration in README for Stage 3.
+# artifacts/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
