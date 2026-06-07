@@ -39,8 +39,32 @@ def profile_text(c: dict) -> str:
 # ---------------------------------------------------------------------------
 # Title / career trajectory
 # ---------------------------------------------------------------------------
+def career_work_evidence(c: dict) -> float:
+    """0..1 from ranking/retrieval/recsys/eval keywords in CAREER DESCRIPTIONS +
+    summary — i.e. what the candidate actually BUILT, not their skills list.
+
+    This is the signal that separates a plain-language Tier-5 (real ranking work,
+    adjacent title) from a keyword-stuffer (buzzwords in the skills list, work
+    described in the descriptions is unrelated). We read descriptions, never skills.
+    """
+    parts = [c["profile"].get("summary", "")]
+    for j in c.get("career_history", []):
+        parts.append(j.get("description", ""))
+    text = " ".join(parts).lower()
+    hits = sum(1 for k in J.WORK_RETRIEVAL if k in text)
+    hits += sum(1 for k in J.WORK_EVAL if k in text)
+    return min(1.0, hits / 5.0)
+
+
 def title_career_fit(c: dict) -> float:
-    """0..1. Decisive anti-stuffer signal driven by titles, not skills."""
+    """0..1. Anti-stuffer signal: title sets the band, real career evidence lifts it.
+
+    Key design (per JD): a "Tier-5" candidate with an adjacent title (Search
+    Engineer, Software Engineer (ML), Backend/Data Engineer) who DESCRIBES building
+    ranking/retrieval/recsys is a strong fit — so career evidence can lift adjacent/
+    neutral titles toward core. Irrelevant titles (Marketing/Graphic Designer) stay
+    capped: a loaded AI-skills list cannot rescue them (CAND_0000083).
+    """
     cur = _lower(c["profile"].get("current_title"))
     hist_titles = [_lower(j.get("title")) for j in c.get("career_history", [])]
     all_titles = [cur] + hist_titles
@@ -55,17 +79,24 @@ def title_career_fit(c: dict) -> float:
         return "neutral"
 
     cur_cls = cls(cur)
-    # Current title dominates; history nudges.
-    base = {"core": 0.95, "adjacent": 0.55, "neutral": 0.35, "irrelevant": 0.08}[cur_cls]
+    ev = career_work_evidence(c)   # 0..1 from descriptions, not skills
 
-    # Reward a trajectory that has been in ML/relevant roles over time.
+    if cur_cls == "core":
+        base = 0.90 + 0.10 * ev
+    elif cur_cls == "adjacent":
+        base = 0.50 + 0.45 * ev    # strong evidence lifts Search Eng / SWE(ML) ~core
+    elif cur_cls == "neutral":
+        base = 0.28 + 0.42 * ev    # only lifts if they actually built ranking/recsys
+    else:  # irrelevant -> capped; keywords/skills cannot rescue a wrong-career profile
+        base = 0.08
+
+    # Trajectory: prior ML/core roles nudge up (but never rescue an irrelevant arc).
     core_hist = sum(1 for t in hist_titles if cls(t) == "core")
-    if core_hist:
-        base = min(1.0, base + 0.05 * core_hist)
-    # A career that is ENTIRELY irrelevant titles cannot be a hidden gem.
+    if core_hist and cur_cls != "irrelevant":
+        base = min(1.0, base + 0.04 * core_hist)
     if all(cls(t) == "irrelevant" for t in all_titles if t):
         base = min(base, 0.05)
-    return base
+    return max(0.0, min(1.0, base))
 
 
 # ---------------------------------------------------------------------------
