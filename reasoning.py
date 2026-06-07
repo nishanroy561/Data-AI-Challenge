@@ -52,28 +52,36 @@ def _named_skill(c: dict):
 
 
 def _evidence_phrase(c: dict):
-    """First real-work phrase whose keyword appears as a WHOLE WORD in the career
-    narrative. Word-boundary matching prevents hallucinations like claiming "built
-    RAG pipelines" because "rag" appeared inside "leverage"."""
-    text = F.profile_text(c)
+    """Return (phrase, company) for the highest-priority real-work keyword, where
+    `company` is the SPECIFIC role whose description contains it — so we never
+    misattribute work to the current employer when it happened at a prior one.
+
+    Word-boundary matching prevents hallucinations like "built RAG pipelines"
+    from "rag" inside "leverage". If the keyword is only in the summary (not tied
+    to a role), company is None and the phrase is stated without an employer.
+    """
+    roles = c.get("career_history", [])
+    summary = c["profile"].get("summary", "")
     for needle, phrase in _EVIDENCE:
-        if F.kw_present(text, [needle]):
-            return phrase
-    return None
+        for j in roles:                      # prefer a concrete role attribution
+            if F.kw_present(j.get("description", ""), [needle]):
+                return phrase, j.get("company")
+        if F.kw_present(summary, [needle]):  # else it's a general summary claim
+            return phrase, None
+    return None, None
 
 
 def make_reasoning(c: dict, comps: dict, rank: int) -> str:
     p = c["profile"]
     yoe = p.get("years_of_experience", 0)
     title = p.get("current_title", "professional")
-    company = p.get("current_company")
     sig = c.get("redrob_signals", {})
 
     # --- strengths, drawn from real fields, rotated for variation ---
     strengths = []
-    ev = _evidence_phrase(c)
+    ev, ev_company = _evidence_phrase(c)
     if ev:
-        strengths.append(ev + (f" at {company}" if company else ""))
+        strengths.append(ev + (f" at {ev_company}" if ev_company else ""))
     sk = _named_skill(c)
     if sk:
         strengths.append(f"hands-on {sk}")
