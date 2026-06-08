@@ -62,16 +62,21 @@ python validate_submission.py submission.csv
 | `precompute.py` | GPU embedding of candidate narratives + JD anchor → `artifacts/` |
 | `rank.py` | CPU-only offline ranker → `submission.csv` |
 | `reasoning.py` | Fact-grounded, non-hallucinated reasoning strings |
-| `notebooks/kaggle_precompute.py` | Kaggle cell-by-cell precompute walkthrough |
+| `validate_submission.py` | Official validator (schema, ranks, tie-breaks) |
+| `notebooks/redrob-ai-challenge-precompute.ipynb` | Kaggle **GPU** notebook: embed 100K candidates → `artifacts/` |
+| `notebooks/redrob-rank.ipynb` | Kaggle **CPU** notebook: offline rank + validator (Stage-3 proof) |
+| `space/` | HuggingFace Spaces sandbox (Streamlit, ≤100-candidate sample) |
 
-## Performance (local CPU, lexical fallback)
+## Performance
 
-100K candidates scored and ranked in **~23 s**, **0 honeypots** in top 100,
-validator clean. (Embeddings improve top-of-ranking differentiation.)
+100K candidates ranked on **Kaggle CPU, offline, with embeddings in ~113 s**
+(well under the 5-min cap), **0 honeypots** in top 100, official validator clean,
+93/100 unique scores, 100/100 unique reasonings. (Local lexical-fallback mode,
+without precomputed artifacts, runs in ~23 s.)
 
-## Status / TODO
+## Status
 
-- [ ] Run `precompute.py` on Kaggle GPU; commit `artifacts/`.
-- [ ] Tune weights in `jd_config.py` against held-out qualitative checks (M4).
-- [ ] Stand up the HuggingFace Spaces sandbox (≤100-candidate sample).
-- [ ] Fill in `submission_metadata.yaml`.
+- [x] GPU precompute on Kaggle → `artifacts/` (candidate + JD embeddings)
+- [x] Offline CPU rank reproduced on Kaggle with **Internet OFF** — validator clean
+- [x] HuggingFace Spaces sandbox live (≤100-candidate sample)
+- [x] `submission_metadata.yaml` complete
