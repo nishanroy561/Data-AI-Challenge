@@ -1,35 +1,34 @@
 # Redrob Hackathon — Submission Metadata
 # Mirrors the metadata submitted via the portal. Stage 3 verifies this file.
-# >>> FILL THE <<<PLACEHOLDER>>> FIELDS before submitting. <<<
 
 # ============================================================================
 # Team identity
 # ============================================================================
-team_name: "<<<YOUR_TEAM_NAME>>>"        # Used in leaderboard and announcements
+team_name: "Token Bandits"               # Used in leaderboard and announcements
 
 primary_contact:
-  name: "<<<YOUR_FULL_NAME>>>"
-  email: "collegenroy@gmail.com"         # confirm this is the contact email you want
-  phone: "<<<+91-XXXXXXXXXX>>>"          # used for top-50 / top-10 outreach
+  name: "Nishan Roy"
+  email: "collegenroy@gmail.com"         # contact email
+  phone: "+91-9830237930"                # used for top-50 / top-10 outreach
 
 team_members:
-  - name: "<<<YOUR_FULL_NAME>>>"
+  - name: "Nishan Roy"
     email: "collegenroy@gmail.com"
     role: "ML Engineer"
-  # Add more members if not solo
 
 # ============================================================================
 # Code and reproducibility
 # ============================================================================
 github_repo: "https://github.com/nishanroy561/Data-AI-Challenge"
 
-sandbox_link: "<<<HUGGINGFACE_SPACES_URL>>>"   # e.g. https://huggingface.co/spaces/nishanroy561/redrob-ranker
-# Required. Build the HF Spaces app (≤100-candidate sample) and paste the URL here.
+sandbox_link: "https://huggingface.co/spaces/nishanroy561/redrob-ranker"
+# HF Spaces app (Streamlit). Ranks a ≤100-candidate sample with the same
+# features.combine_score as rank.py; embeds the uploaded sample on the fly.
 
 reproduce_command: "python rank.py --candidates ./candidates.jsonl --artifacts ./artifacts --out ./submission.csv"
 # Single command that produces submission.csv. Embeddings in ./artifacts are
 # pre-computed offline (see precompute.py); the ranking step itself is CPU-only,
-# offline, and completes in ~42s for the 100K pool.
+# offline, and completes in ~113s for the 100K pool (Kaggle CPU, well under the 5-min cap).
 
 # ============================================================================
 # Compute environment
@@ -82,7 +81,7 @@ methodology_summary: |
   multiply the score so unavailable candidates are down-weighted. An internal-
   consistency check (tenure vs experience, expert-with-zero-months) gates out
   honeypots. Embeddings are precomputed offline on GPU; the ranking step is pure
-  CPU numpy, ~42s for 100K, fully offline. Reasoning is built from real profile
+  CPU numpy, ~113s for 100K, fully offline. Reasoning is built from real profile
   facts (named skills, employer, signal values) — no LLM in the ranking path.
 
 # ============================================================================
