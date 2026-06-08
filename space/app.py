@@ -120,4 +120,5 @@ with gr.Blocks(title="Redrob Candidate Ranker") as demo:
     btn.click(rank, inputs=[file_in, text_in, top_k], outputs=[table, csv_out])
 
 if __name__ == "__main__":
-    demo.launch()
+    # show_api=False avoids the gradio_client schema-introspection bug
+    demo.launch(show_api=False)
