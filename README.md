@@ -4,6 +4,8 @@ Ranks the top-100 candidates from a 100K-profile pool for the *Senior AI Enginee
 — Founding Team* job description, under the hackathon's hard constraints
 (CPU-only, offline, ≤5 min, ≤16 GB for the ranking step).
 
+**Team Token Bandits** · Live sandbox: <https://huggingface.co/spaces/nishanroy561/redrob-ranker>
+
 ## Core idea
 
 The dataset is adversarial: keyword-stuffers list every AI buzzword (RAG, Pinecone,
@@ -69,10 +71,10 @@ python validate_submission.py submission.csv
 
 ## Performance
 
-100K candidates ranked on **Kaggle CPU, offline, with embeddings in ~113 s**
-(well under the 5-min cap), **0 honeypots** in top 100, official validator clean,
-93/100 unique scores, 100/100 unique reasonings. (Local lexical-fallback mode,
-without precomputed artifacts, runs in ~23 s.)
+Ranking step on **Kaggle CPU, offline: ~113 s** for the full 100K pool (under the
+5-min cap), peak RAM **< 4 GB** (16 GB budget). Top-100 output: **0 honeypots**,
+official validator clean, **93/100 unique scores**, **100/100 unique reasonings**.
+A no-embedding lexical fallback is available for quick local testing (see Reproduce).
 
 ## Status
 
