@@ -14,6 +14,27 @@ import json, os, subprocess, sys, tempfile
 
 import numpy as np
 import pandas as pd
+
+# --- Workaround for a gradio_client bug (TypeError: argument of type 'bool' is
+# not iterable). When a component schema has `additionalProperties: true`, the
+# schema value is a bool and json_schema_to_python_type / get_type crash on it.
+# Patch both to tolerate booleans. Must run before gradio builds its API info. ---
+import gradio_client.utils as _gcu
+
+_orig_jstpt = _gcu._json_schema_to_python_type
+def _safe_jstpt(schema, defs=None):
+    if isinstance(schema, bool):
+        return "Any"
+    return _orig_jstpt(schema, defs)
+_gcu._json_schema_to_python_type = _safe_jstpt
+
+_orig_get_type = _gcu.get_type
+def _safe_get_type(schema):
+    if not isinstance(schema, dict):
+        return "Any"
+    return _orig_get_type(schema)
+_gcu.get_type = _safe_get_type
+
 import gradio as gr
 
 # ---- pull the real ranking modules from the repo (single source of truth) ----
