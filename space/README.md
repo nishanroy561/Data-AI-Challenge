@@ -3,8 +3,8 @@ title: Redrob Candidate Ranker
 emoji: 🎯
 colorFrom: red
 colorTo: indigo
-sdk: gradio
-sdk_version: 4.44.1
+sdk: streamlit
+sdk_version: 1.40.0
 python_version: "3.11"
 app_file: app.py
 pinned: false
@@ -28,6 +28,6 @@ inputs empty to rank a bundled 50-candidate sample.
   career-history evidence (not the skills list) is the decisive anti-stuffer
   signal.
 
-The full 100K reproduction runs offline on CPU in ~42s from the GitHub repo —
+The full 100K reproduction runs offline on CPU in ~2 min from the GitHub repo —
 see its README. This Space is the small-sample sanity check required by the
 submission spec (Section 10.5).
