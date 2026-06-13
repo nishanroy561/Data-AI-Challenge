@@ -38,22 +38,39 @@ The slow embedding work happens once in precompute and is saved to `artifacts/`.
 `rank.py` loads those arrays and does fast vectorised CPU scoring — **no model,
 no network**.
 
+## Setup
+
+- **Python 3.11+** (developed on 3.12).
+- Install deps: `pip install -r requirements.txt` — the ranking step (`rank.py`)
+  needs only **numpy**; `sentence-transformers`/`torch` are precompute-only.
+- The embeddings in `artifacts/` are tracked with **git-lfs**. Run `git lfs install`
+  once, then clone (or `git lfs pull` in an existing clone) so the `.npy` files
+  download — otherwise you only get LFS pointer stubs.
+
 ## Reproduce
 
-```bash
-# 1. (offline phase, GPU box e.g. Kaggle) generate embeddings
-python precompute.py --candidates ./candidates.jsonl --out ./artifacts
+`candidates.jsonl` is the organizer-provided 100K pool (not committed, ~487 MB) —
+place it at the repo root or pass its path. The `artifacts/` (precomputed
+embeddings) **are** committed, so reproduction is a single offline command:
 
-# 2. (CPU, no network) produce the submission CSV  <-- the Stage-3 reproduce command
+```bash
+# Stage-3 reproduce command — CPU-only, no network, < 5 min.
+# Reads the bundled artifacts/ and produces the exact submitted top-100.
 python rank.py --candidates ./candidates.jsonl --artifacts ./artifacts --out ./submission.csv
 
-# 3. validate before uploading
+# validate before uploading
 python validate_submission.py submission.csv
 ```
 
-> `rank.py` also runs **without** `artifacts/` using a lexical work-keyword
-> fallback (a no-embedding baseline) — handy for quick local testing, but commit
-> the embeddings for the real submission.
+Regenerating the embeddings from scratch is **optional** (GPU + network) — only
+needed if you want to rebuild `artifacts/` yourself:
+
+```bash
+python precompute.py --candidates ./candidates.jsonl --out ./artifacts
+```
+
+> Without `artifacts/`, `rank.py` falls back to a lexical, no-embedding baseline —
+> a *different* result, useful only for a quick local smoke test, not the submission.
 
 ## Files
 
